@@ -123,8 +123,11 @@ class DocumentViewSet(PermissionViewMixin, VisibilityViewMixin, ModelViewSet):
     def copy(self, request, pk=None):
         document = self.get_object()
         user, group = get_user_and_group_from_request(request)
+        context = super().get_serializer_context()
 
-        copy_request_serializer = serializers.CopyRequestSerializer(data=request.data)
+        copy_request_serializer = serializers.CopyRequestSerializer(
+            data=request.data.get("data", {}), context=context
+        )
         copy_request_serializer.is_valid(raise_exception=True)
         category = (
             copy_request_serializer.validated_data.get("category", False)

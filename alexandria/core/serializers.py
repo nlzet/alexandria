@@ -361,10 +361,14 @@ class SearchResultSerializer(Serializer):
         read_only_fields = fields
 
 
-class CopyRequestSerializer(Serializer):
+class CopyRequestSerializer(BaseSerializer):
     category = serializers.ResourceRelatedField(
         queryset=models.Category.objects,
         required=False,
         allow_null=True,
         allow_empty=True,
     )
+
+    class Meta:
+        model = models.Document
+        fields = BaseSerializer.Meta.fields + ("category",)

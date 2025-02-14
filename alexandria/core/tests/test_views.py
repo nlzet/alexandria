@@ -409,24 +409,29 @@ def test_move_document_to_new_category(
         ("not_allowed", HTTP_400_BAD_REQUEST),
     ],
 )
+@pytest.mark.parametrize(
+    "to_document",
+    ["new", "non_existent"],
+)
 def test_copy_document(
     admin_client,
     category_factory,
     file_factory,
     document_factory,
     to_category,
+    to_document,
     expected_status,
 ):
     category_not_allowed = category_factory.create(allowed_mime_types=["plain/text"])
     category = category_factory()
     document = document_factory(category=category)
     file_factory.create(document=document, name="Image.jpeg", mime_type="image/jpeg")
-    temp_category = category_factory()
-    temp_category_pk = temp_category.pk
-    temp_category.delete()
+    document_pk = document.pk
 
     if to_category == "non_existent":
-        target_category_pk = temp_category_pk
+        temp_category = category_factory()
+        target_category_pk = temp_category.pk
+        temp_category.delete()
     elif to_category == "new":
         target_category_pk = category_factory().pk
     elif to_category == "not_allowed":
@@ -434,10 +439,19 @@ def test_copy_document(
     else:
         target_category_pk = document.category.pk
 
+    if to_document == "non_existent":
+        temp_document = document_factory(category=category)
+        document_pk = temp_document.pk
+        temp_document.delete()
+
     data = {
-        "category": {
-            "type": "categories",
-            "id": str(target_category_pk),
+        "data": {
+            "type": "documents",
+            "id": str(document_pk),
+            "category": {
+                "type": "categories",
+                "id": str(target_category_pk),
+            },
         }
     }
 
@@ -446,8 +460,16 @@ def test_copy_document(
     elif to_category == "null":
         data["category"] = None
 
-    url = reverse("document-copy", args=[document.pk])
-    response = admin_client.post(url, data=data, format="json")
+    url = reverse("document-copy", args=[document_pk])
+    response = admin_client.post(
+        url,
+        data=data,
+        format="json",
+    )
+
+    if to_document == "non_existent":
+        assert response.status_code == HTTP_404_NOT_FOUND
+        return
 
     assert response.status_code == expected_status
     if to_category == "not_allowed":
@@ -457,6 +479,7 @@ def test_copy_document(
         )
 
     if expected_status == HTTP_201_CREATED:
+        assert response.json()["data"]["id"] != document_pk
         assert (
             response.json()["data"]["relationships"]["category"]["data"]["id"]
             == target_category_pk
