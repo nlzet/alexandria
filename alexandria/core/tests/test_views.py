@@ -681,3 +681,39 @@ def test_document_update_content_vector(
         document.files.filter(variant=File.Variant.ORIGINAL).first().content_vector
         == "'blue':1 'green':3B 'import':4C 'new':2A 'text':5C"
     )
+
+
+@pytest.mark.parametrize(
+    "new_title,expected_response",
+    [
+        ("valid_filename.txt", HTTP_200_OK),
+        ("unsafe: filename?.txt", HTTP_400_BAD_REQUEST),
+    ],
+)
+def test_document_update_title(
+    admin_client,
+    document_factory,
+    file_factory,
+    new_title,
+    expected_response,
+):
+    original_filename = "test.txt"
+    document = document_factory(title=original_filename, description="test")
+    file_factory.create(document=document, name=original_filename)
+
+    url = reverse("document-detail", args=[document.pk])
+    data = {
+        "data": {
+            "type": "documents",
+            "id": document.pk,
+            "attributes": {"title": new_title},
+        }
+    }
+
+    response = admin_client.patch(url, data)
+    assert response.status_code == expected_response
+
+    document.refresh_from_db()
+    assert document.title == (
+        new_title if expected_response == HTTP_200_OK else original_filename
+    )

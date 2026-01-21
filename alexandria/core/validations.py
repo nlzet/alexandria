@@ -6,6 +6,7 @@ from clamdpy import ClamdNetworkSocket
 from django.conf import settings
 from django.utils.translation import gettext_lazy
 from generic_permissions.validation import validator_for
+from pathvalidate import sanitize_filename
 from rest_framework.exceptions import ValidationError
 
 from alexandria.core.models import Document, File
@@ -120,4 +121,17 @@ class AlexandriaValidator:
                 # mime type of the file is still compatible with the category's
                 # mime types.
                 validate_mime_type(document.get_latest_original().mime_type, category)
+
+        if context["request"].method == "PATCH" and "title" in data:
+            title = data["title"]
+            safe_filename = sanitize_filename(title)
+
+            if title != safe_filename:
+                raise ValidationError(
+                    gettext_lazy(
+                        "Document title contains unsafe characters. Suggested title: %(safe_title)s."
+                        % {"safe_title": safe_filename}
+                    )
+                )
+
         return data
